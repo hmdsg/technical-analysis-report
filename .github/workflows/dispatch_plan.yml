@@ -2,13 +2,7 @@ name: 'dispatch'
 
 on:
   workflow_dispatch:
-    inputs:
-        input:
-          description: 'type me'
-          required: true
-          default: 'master'
-
-
+    
 jobs:
   terraform-plan:
     name: 'Terraform'
