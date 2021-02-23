@@ -1,9 +1,14 @@
-name: 'Terraform-plan'
+name: 'dispatch'
 
 on:
-  pull_request:
-    branches:
-    - main
+  workflow_dispatch:
+    inputs:
+        logLevel:
+        description: 'If run flow, input "apply".'
+        required: true
+        default: ''
+    branches: [ main ]
+
 
 jobs:
   terraform-plan:
@@ -14,6 +19,7 @@ jobs:
         dir: [
           terraform/lambda,
           terraform/s3,
+          terraform/dynamodb,
         ]
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
@@ -52,8 +58,14 @@ jobs:
       working-directory: ${{ matrix.dir }}
       run: terraform init
 
+
     # Generates an execution plan for Terraform
     - name: Terraform Plan
       if: steps.diff.outputs.diff
       working-directory: ${{ matrix.dir }}
       run: terraform plan
+
+    - name: Terraform Apply
+      if: steps.diff.outputs.diff && github.event.inputs.logLevel == 'run'
+      working-directory: ${{ matrix.dir }}
+      run: terraform apply -auto-approve
