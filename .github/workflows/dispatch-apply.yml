@@ -3,14 +3,14 @@ name: 'Dispatch-apply'
 on:
   workflow_dispatch:
     inputs:
-        logLevel:
+      apply:
         description: 'If run flow, input "apply".'
         required: true
         default: ''
-    branches: [ main ]
 
 jobs:
   terraform-plan:
+    if: github.event.inputs.apply == 'apply'
     name: 'Terraform'
     runs-on: ubuntu-latest
     strategy:
@@ -64,6 +64,6 @@ jobs:
       run: terraform plan
 
     - name: Terraform Apply
-      if: steps.diff.outputs.diff && github.event.inputs.logLevel == 'run'
+      if: steps.diff.outputs.diff
       working-directory: ${{ matrix.dir }}
       run: terraform apply -auto-approve
