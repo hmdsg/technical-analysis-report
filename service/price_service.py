@@ -10,6 +10,8 @@ dfType = pd.core.frame.DataFrame
 def get_price(name:str, start:str=None) -> dfType:
     """
     価格情報を取得する
+    ex) start = '01/01/2020'
+    EX)  ticker = 'zm.us'
     :param name: ticker名
     :param start: 取得したいデータの開始日
     :return:価格情報のデータフレーム
@@ -23,13 +25,6 @@ def drow(stockprice:dfType) -> None:
     :param stockprice:価格情報のデータフレーム
     """
     mpf.plot(stockprice, type='candle',  mav=(5, 25, 75), volume=True, datetime_format='%d/%m/%Y')
-
-
-# start = '01/01/2020'
-# ticker = 'zm.us'
-# stockprice =  get_price(ticker, start)
-# drow(stockprice)
-
 
 def get_premarket(ticker:str="aapl.us") -> float:
     """
@@ -45,4 +40,3 @@ def get_premarket(ticker:str="aapl.us") -> float:
 
     return float(soup.find(id=id).text)
 
-print(get_premarket("zm.us"))
