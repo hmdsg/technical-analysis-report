@@ -9,3 +9,4 @@ if __name__ == '__main__':
 
     print(ticker.trend_25ma)
 
+    print(ticker.domination_rate_25ma)
