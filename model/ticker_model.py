@@ -17,6 +17,7 @@ class Ticker:
     domination_rate_25ma = 0.0
 
     def __post_init__(self):
+
         self.price_df = ps.get_price(self.name)
 
         self._insert_ma(25)
@@ -33,7 +34,7 @@ class Ticker:
     def _insert_ma(self, ma_days: int):
         """
         dfに移動平均値を挿入する
-        :param days: 移動平均の日数
+        :param ma_days: 移動平均の日数
         :return:
         """
         assert self.price_df is not None
