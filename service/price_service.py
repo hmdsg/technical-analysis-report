@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 dfType = pd.core.frame.DataFrame
 
 
-def get_price(name: str, start: str = '01/01/2020', end: str = None) -> dfType:
+def get_price(name: str, start: str = '01/01/2021', end: str = None) -> dfType:
     """
     価格情報を取得する
     ex) start = '01/01/2020'
@@ -18,8 +18,9 @@ def get_price(name: str, start: str = '01/01/2020', end: str = None) -> dfType:
     :return:価格情報のデータフレーム
     """
 
-    return data.DataReader(name=name, data_source='stooq', start=start, end=end).sort_values('Date')
+    res = data.DataReader(name=name, data_source='yahoo', start=start, end=end)
 
+    return res
 
 def drow(stockprice: dfType) -> None:
     """
