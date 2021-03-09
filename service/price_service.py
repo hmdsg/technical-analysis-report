@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 dfType = pd.core.frame.DataFrame
 
 
-def get_price(name: str, start: str = '01/01/2021', end: str = None) -> dfType:
+def get_price(name: str, start: str = '01/09/2020', end: str = None) -> dfType:
     """
     価格情報を取得する
     ex) start = '01/01/2020'
