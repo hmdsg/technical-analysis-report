@@ -1,0 +1,7 @@
+{
+  "name": "sp500",
+  "country": "united states",
+  "ticker_list": [
+                "RTX"
+                ]
+}

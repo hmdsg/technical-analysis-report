@@ -1,0 +1,7 @@
+{
+  "name": "nikkei225",
+  "country": "japan",
+  "ticker_list": [
+    "9009"
+  ]
+}
