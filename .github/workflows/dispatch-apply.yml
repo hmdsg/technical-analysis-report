@@ -1,0 +1,70 @@
+name: 'Dispatch-apply'
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'If run flow, input "apply".'
+        required: true
+        default: ''
+
+jobs:
+  terraform-plan:
+    if: github.event.inputs.apply == 'apply'
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [
+          terraform/lambda,
+          terraform/s3,
+          terraform/dynamodb,
+        ]
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Check diff
+      id: diff
+      uses: technote-space/get-diff-action@v4.0.2
+      with:
+        PATTERNS: |
+          terraform/**/*.tf
+          ${{ matrix.dir }}/**/*.tf
+          ${{ matrix.dir }}/**/**/*z
+
+    - name: configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-northeast-1
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 0.12.25
+
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
+      if: steps.diff.outputs.diff
+      working-directory: ${{ matrix.dir }}
+      run: terraform init
+
+    # Generates an execution plan for Terraform
+    - name: Terraform Plan
+      if: steps.diff.outputs.diff
+      working-directory: ${{ matrix.dir }}
+      run: terraform plan
+
+    - name: Terraform Apply
+      if: steps.diff.outputs.diff
+      working-directory: ${{ matrix.dir }}
+      run: terraform apply -auto-approve
