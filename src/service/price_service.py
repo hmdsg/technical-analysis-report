@@ -1,16 +1,15 @@
 import pandas as pd
-from pandas_datareader import data
 import mplfinance as mpf
 import requests
 from bs4 import BeautifulSoup
-import investpy
 from utils import price
 import sys
+import datetime
 
 dfType = pd.core.frame.DataFrame
+DEFAULT_PERIOD = 180
 
-
-def get_price(name: str, country: str, start: str = '01/09/2020', end=None) -> dfType:
+def get_price(name: str, country: str, start: str = None, end=None) -> dfType:
     """
     価格情報を取得する
     ex) start = '01/01/2020'
@@ -20,6 +19,15 @@ def get_price(name: str, country: str, start: str = '01/09/2020', end=None) -> d
     :param end: 取得したいデータの終了日
     :return:価格情報のデータフレーム
     """
+
+    now = datetime.datetime.now()
+
+    if start is None:
+        td = datetime.timedelta(days=DEFAULT_PERIOD)
+        start = (now-td).strftime("%m/%d/%Y")
+
+    if end is None:
+        end = now.strftime("%m/%d/%Y")
 
     if country == "united states":
         return price.get_price_us_datareader(name, start, end)

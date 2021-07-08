@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from service import price_service as ps
 from utils import stock
 import pandas as pd
+import math
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -21,7 +22,7 @@ class Ticker:
     last_position_25ma = 0
     deviation_rate_25ma = 0.0
     domination_rate_25ma = 0.0
-    last_over_25ma = 0
+    period_list_25ma = []
 
     def __post_init__(self):
 
@@ -29,9 +30,12 @@ class Ticker:
         self.price_df = ps.get_price(self.code, self.country)
         self._insert_ma(25)
         self._insert_ma_vs_Close(25)
-        self._check_last_over(25)
+        self._insert_ma_domination_rate(25)
         self.trend_direction_25ma = self._get_trend_direction(25)
         self.deviation_rate_25ma = self._check_deviation_rate(25)
+        self.period_list_25ma = [period for period in self._get_over_under_period(25)]
+        print(self.period_list_25ma)
+
 
     def _get_name(self):
         """
@@ -67,31 +71,48 @@ class Ticker:
 
         self.price_df[f"{ma_name}_vs_Close"] = self.price_df['Close'] - self.price_df[ma_name]
 
-    def _check_last_over(self, ma_days: int):
-        """
-        終値が指定の移動平均線を超えた最後の日にちを検索する
-        ただし、前日は除く。
-        :param ma_days: 移動平均の日数
-        """
-
+    def _get_over_under_period(self, ma_days: int) -> int:
         ma_name = 'MA_' + str(ma_days)
         assert self.price_df is not None
 
-        if self.price_df.iloc[-1][f"{ma_name}_vs_Close"] < 0:
-            # 移動平均線を下回っている時
-            for day in (range(1, 100)):
-                day = day * -1
-                if self.price_df.iloc[day][f"{ma_name}_vs_Close"] > 0:
-                    self.last_over_25ma = day * (-1)
-                    break
+        position = 1 if self.price_df.iloc[-1][f"{ma_name}_vs_Close"] > 0 else -1
 
+        for index, diff in (enumerate(reversed(self.price_df[f"{ma_name}_vs_Close"]))):
+            # 下のまま
+            if diff < 0 and position == -1:
+                position = -1
+            # 上から下
+            elif diff < 0 and position == 1:
+                position = -1
+                yield index + 1
+            # 上のまま
+            elif diff >= 0 and position == 1:
+                position = 1
+            # 下から上
+            elif diff >= 0 and position == -1:
+                position = 1
+                yield index + 1
+            elif math.isnan(diff):
+                break
+            else:
+                print("unknown _get_over_under_period", index, diff, position)
+                break
+
+
+    def is_over_ma(self, ma_days: int, ref_day: int) -> bool:
+        """
+        ref_dayの終値がma_daysを超えているか判定する
+        :param ma_days:
+        :return: bool
+        """
+        ma_name = 'MA_' + str(ma_days)
+        assert self.price_df is not None
+
+        ref_day = ref_day * -1
+        if self.price_df.iloc[ref_day][f"{ma_name}_vs_Close"] > 0:
+            return True
         else:
-            # 移動平均線を上回っている時
-            for day in (range(1, 100)):
-                day = day * -1
-                if self.price_df.iloc[day][f"{ma_name}_vs_Close"] < 0:
-                    self.last_over_25ma = day
-                    break
+            return False
 
     def _get_trend_direction(self, ma_days: int) -> int:
         """
@@ -124,7 +145,6 @@ class Ticker:
         else:
             return 0
 
-
     def _check_deviation_rate(self, ma_days: int) -> float:
         """
         前日の終値と移動平均値の乖離率を百分率で返す。
@@ -136,28 +156,48 @@ class Ticker:
             100 * (self.price_df.iloc[-1]['Close'] - self.price_df.iloc[-1][ma_name]) / self.price_df.iloc[-1]['Close'],
             1)
 
-    def positive_domination_rate(self, ref_day: int, ma_days: int) -> float:
+    def _insert_ma_domination_rate(self, ma_days: int):
         """
-        陽線の移動平均値からの剥離値がロウソクの胴体占める割合
+        ロウソク胴体の移動平均値からの剥離率
+
+
         """
 
         ma_name = 'MA_' + str(ma_days)
+        column = ma_name + "_domination_rate"
 
-        if self.price_df.iloc[ref_day]['Close'] > self.price_df.iloc[ref_day][ma_name]:
+        # 始値と終値が移動平均線を超えない時(胴体が移動平均線の下)
+        self.price_df.loc[(self.price_df['Open'] <= self.price_df[ma_name]) & \
+                          (self.price_df['Close'] <= self.price_df[ma_name]), column] \
+            = -100
 
-            return 100 * (self.price_df.iloc[ref_day]['Close'] - self.price_df.iloc[ref_day][ma_name]) / (self.price_df.iloc[ref_day]['Close'] - self.price_df.iloc[ref_day]['Open'])
+        # 始値と終値が移動平均線を超えている時(胴体が移動平均線の上)
+        self.price_df.loc[(self.price_df['Open'] >= self.price_df[ma_name]) & \
+                          (self.price_df['Close'] >= self.price_df[ma_name]), column] \
+            = 100
 
-        else:
-            return 0
+        # 陰線で移動平均線をクロスしている時(胴体が移動平均線とクロス)
+        self.price_df.loc[(self.price_df['Close'] < self.price_df[ma_name]) & \
+                          (self.price_df['Open'] >= self.price_df[ma_name]), column] \
+            = -100 * (self.price_df['Open'] - self.price_df[ma_name]) / \
+              (self.price_df['Open'] - self.price_df['Close'])
 
-    def check_line(self, ref_day: int) -> int:
+        # 陽線で移動平均線をクロスしている時(胴体が移動平均線とクロス)
+        self.price_df.loc[(self.price_df['Close'] > self.price_df[ma_name]) & \
+                          (self.price_df['Open'] <= self.price_df[ma_name]), column] \
+            = 100 * (self.price_df['Close'] - self.price_df[ma_name]) / \
+              (self.price_df['Close'] - self.price_df['Open'])
+
+    def is_positive_line(self, ref_day: int) -> bool:
         """
         相対的な指定日が陽線か陰線かを判定する。
         """
 
         if self.price_df.iloc[ref_day]['Close'] - self.price_df.iloc[ref_day]['Open'] > 0:
-            return 1
-        elif self.price_df.iloc[ref_day]['Close'] - self.price_df.iloc[ref_day]['Open'] < 0:
-            return -1
+            return True
         else:
-            return 0
+            return False
+
+    def get_ma_vs_close(self, ma_days: int, ref_day: int) -> int:
+
+        return self.price_df.iloc[ref_day][f"{'MA_' + str(ma_days)}_vs_Close"]

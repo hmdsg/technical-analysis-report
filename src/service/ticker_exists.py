@@ -1,8 +1,5 @@
 import pandas as pd
 from pandas_datareader import data
-import mplfinance as mpf
-import requests
-from bs4 import BeautifulSoup
 import datetime
 import investpy
 

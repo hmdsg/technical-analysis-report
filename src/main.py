@@ -1,12 +1,16 @@
 from model.ticker_model import Ticker
+from utils import writer as wr
 from service import price_service as ps
 import json
+import datetime
+
 
 # ticker_list = ["AMD"]
 
-def read_json(filename:str) -> dict:
+def read_json(filename: str) -> dict:
     with open(f'data/{filename}') as f:
         return json.load(f)
+
 
 def is_buy(ticker, ma_day: int, ref_day: int) -> bool:
     """
@@ -19,14 +23,11 @@ def is_buy(ticker, ma_day: int, ref_day: int) -> bool:
     """
     DOMINARION_CRITERION = 50
 
-    # 1
-    line = ticker.check_line(ref_day)
-    #print(f"陰線・陽線判定結果：{line}")
+    ma_name = 'MA_' + str(ma_day)
+    column = ma_name + "_domination_rate"
 
-    # 2
-    if line == 1:
-        domination_rate = ticker.positive_domination_rate(ref_day, ma_day)
-        #print(f"占有率判定結果：{domination_rate}")
+    if ticker.is_positive_line(ref_day):
+        domination_rate = ticker.price_df.iloc[ref_day][column]
 
         if domination_rate > DOMINARION_CRITERION:
             return True
@@ -36,56 +37,63 @@ def is_buy(ticker, ma_day: int, ref_day: int) -> bool:
     else:
         return False
 
-
 def buy_jadge(ticker, ma_day: int) -> bool:
     """
     購入判定を行う
 
     1.前日のis_buyがTrue
-    2.3日前のis_buyがFalse
-    3.3日前の終値が25日移動平均線より低い
-    4.最後に25日移動平均線を超えたのが3日以上前
+    2.最後に25日移動平均線を超えたのが5日以上前
 
     :param ticker:
     :param ma_day:
     :return:
     """
 
-    if is_buy(ticker, MA_DAY, -1) and not is_buy(ticker, MA_DAY, -3) and ticker.get_trend(-3, 25) != 1 and ticker.last_over_25ma > 3:
-        print(f"最終判定結果:True")
+    print(f"last diff is {ticker.get_ma_vs_close(25, -1)}")
 
+    if len(ticker.period_list_25ma) < 2:
+        print("periodのデータ数が足りません")
+        return False
+
+    if is_buy(ticker, MA_DAY, -1) \
+            and (ticker.period_list_25ma[0] < 3) \
+            and (ticker.period_list_25ma[1] - ticker.period_list_25ma[0]) > 5:
+        print("最終判定結果:True")
         return True
     else:
+        print("最終判定結果:False")
+        # print("is_buy(ticker, MA_DAY, -1)")
+        # print(is_buy(ticker, MA_DAY, -1))
+        # print("ticker.period_list_25ma[0] < 3")
+        # print(ticker.period_list_25ma[0] < 3)
+        # print("ticker.period_list_25ma[1] - ticker.period_list_25ma[0] > 5")
+        # print(ticker.period_list_25ma[1] - ticker.period_list_25ma[0] > 5)
         return False
 
 
 if __name__ == '__main__':
     MA_DAY = 25
+    now = datetime.datetime.now()
     # data_filename = "nikkei225.json"
     # data_filename = "nikkei225_test.json"
-    data_filename = "sp500.json"
-    #data_filename = "nasdaq100.json"
-    #data_filename = "sp500_test.json"
+    # data_filename = "sp500.json"
+    # data_filename = "nasdaq100.json"
+    data_filename = "sp500_test.json"
 
     data = read_json(data_filename)
 
     for ticker in data["ticker_list"]:
-        print ("=================================")
+        print("=================================")
         ticker = Ticker(ticker, data["country"])
 
         print(f"名称:{ticker.name}")
         print(f"証券コード:{ticker.code}")
 
-        #dfデバック
+        # dfデバック
         print(ticker.price_df)
 
-        print(f"last_over_25ma: {ticker.last_over_25ma}")
-
-        # print(f"購入判定結果:{is_buy(ticker, MA_DAY, -3)}")
-        # print(f"購入判定結果:{is_buy(ticker, MA_DAY, -2)}")
-        # print(f"購入判定結果:{is_buy(ticker, MA_DAY, -1)}")
+        print(f"last_over_25ma: {ticker.period_list_25ma[0]}")
 
         if buy_jadge(ticker, 25):
-            ps.drow(ticker.price_df)
-
-
+            wr.write(ticker.price_df, f"./out/{ticker.code}.png", f"{ticker.code}  {now.strftime('%m/%d/%Y')}")
+            #ps.drow(ticker.price_df)
